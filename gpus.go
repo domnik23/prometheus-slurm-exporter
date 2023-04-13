@@ -22,6 +22,7 @@ import (
 	"os/exec"
 	"strings"
 	"strconv"
+	"fmt"
 )
 
 type GPUsMetrics struct {
@@ -38,13 +39,14 @@ func GPUsGetMetrics() *GPUsMetrics {
 func ParseAllocatedGPUs() float64 {
 	var num_gpus = 0.0
 
-	args := []string{"-a", "-X", "--format=Allocgres", "--state=RUNNING", "--noheader", "--parsable2"}
+	args := []string{"-a", "-X", "--format=AllocTRES", "--state=RUNNING", "--noheader", "--parsable2"}
 	output := string(Execute("sacct", args))
 	if len(output) > 0 {
 		for _, line := range strings.Split(output, "\n") {
-			if len(line) > 0 {
+			if strings.Contains(line,"gpu") {
 				line = strings.Trim(line, "\"")
 				descriptor := strings.TrimPrefix(line, "gpu:")
+				fmt.Println ("DEBUG: ", descriptor)
 				job_gpus, _ := strconv.ParseFloat(descriptor, 64)
 				num_gpus += job_gpus
 			}
@@ -52,6 +54,10 @@ func ParseAllocatedGPUs() float64 {
 	}
 
 	return num_gpus
+}
+
+func main() {
+	ParseAllocatedGPUs()
 }
 
 func ParseTotalGPUs() float64 {
@@ -66,6 +72,9 @@ func ParseTotalGPUs() float64 {
 				descriptor := strings.Fields(line)[1]
 				descriptor = strings.TrimPrefix(descriptor, "gpu:")
 				descriptor = strings.Split(descriptor, "(")[0]
+				if strings.Contains(descriptor,":")  {
+					descriptor = strings.Split(descriptor, ":")[1]
+				}
 				node_gpus, _ :=  strconv.ParseFloat(descriptor, 64)
 				num_gpus += node_gpus
 			}
@@ -139,3 +148,4 @@ func (cc *GPUsCollector) Collect(ch chan<- prometheus.Metric) {
 	ch <- prometheus.MustNewConstMetric(cc.total, prometheus.GaugeValue, cm.total)
 	ch <- prometheus.MustNewConstMetric(cc.utilization, prometheus.GaugeValue, cm.utilization)
 }
+
